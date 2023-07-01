@@ -15,21 +15,24 @@ providers = [
 
 print('Starting up bot...')
 
-messages = []
-def handle_response(text):
-    messages.append({"role": "user", "content": text})
+messages = {}
+def handle_response(text, id):
+    messages[id].append({"role": "user", "content": text})
     # Reduce conversation size to avoid API Token quantity error
     for provider in providers:
-        response = g4f.ChatCompletion.create(model='gpt-3.5-turbo', provider=provider, messages=messages[-5:], stream=False)
+        response = g4f.ChatCompletion.create(model='gpt-3.5-turbo', provider=provider, messages=messages[id][-5:], stream=False)
         if response: break
-    messages.append({"role": "system", "content": response})
+    messages[id].append({"role": "system", "content": response})
     return response
 
 # Lets us use the /start command
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    messages.update({update.message.chat.id:[]})
     await update.message.reply_text('Hello there! I\'m a TeleGPT bot. What\'s up?')
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.id not in messages:
+        messages.update({update.message.chat.id:[]})
     # Get basic info of the incoming message
     message_type: str = update.message.chat.type
     text: str = update.message.text
@@ -42,11 +45,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Replace with your bot username
         if BOT_USERNAME in text:
             new_text: str = text.replace(BOT_USERNAME, '').strip()
-            response: str = handle_response(new_text)
+            response: str = handle_response(new_text, update.message.chat.id)
         else:
             return  # We don't want the bot respond if it's not mentioned in the group
     else:
-        response: str = handle_response(text)
+        response: str = handle_response(text, update.message.chat.id)
 
     # Reply normal if the message is in private
     print('Bot:', response)
